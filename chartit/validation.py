@@ -6,6 +6,7 @@ from django.db.models.manager import Manager
 from django.db.models.query import QuerySet
 
 from .exceptions import APIInputError
+import collections
 
 
 def _validate_field_lookup_term(model, term):
@@ -70,7 +71,7 @@ def _validate_func(func):
                             "Got %s of type %s instead" % (func, type(func)))
 
 def _clean_categories(categories, source):
-    if isinstance(categories, basestring):
+    if isinstance(categories, str):
         categories = [categories]
     elif isinstance(categories, (tuple, list)):
         if not categories:
@@ -84,14 +85,14 @@ def _clean_categories(categories, source):
                             %(categories, type(categories)))
     field_aliases = {}
     for c in categories:
-        if c in source.query.aggregates.keys() or c in source.query.extra.keys():
+        if c in list(source.query.aggregates.keys()) or c in list(source.query.extra.keys()):
             field_aliases[c] = c
         else:
             field_aliases[c] = _validate_field_lookup_term(source.model, c)
     return categories, field_aliases
 
 def _clean_legend_by(legend_by, source):
-    if isinstance(legend_by, basestring):
+    if isinstance(legend_by, str):
         legend_by = [legend_by]
     elif isinstance(legend_by, (tuple, list)):
         pass
@@ -136,7 +137,7 @@ def _convert_pdps_to_dict(series_list):
         if isinstance(terms, dict):
             if not terms:
                 raise APIInputError("'terms' cannot be empty.")
-            for tk, tv in terms.items():
+            for tk, tv in list(terms.items()):
                 if isinstance(tv, Aggregate):
                     tv = {'func': tv}
                 elif isinstance(tv, dict):
@@ -162,7 +163,7 @@ def clean_pdps(series):
     elif isinstance(series, dict):
         if not series:
             raise APIInputError("'series' cannot be empty.")
-        for td in series.values():
+        for td in list(series.values()):
             # td is not a dict
             if not isinstance(td, dict):
                 raise APIInputError("Expecting a dict in place of: %s" %td)
@@ -224,11 +225,11 @@ def _convert_dps_to_dict(series_list):
             raise APIInputError("%s is missing the 'terms' key." %sd)
         if isinstance(terms, list):
             for term in terms:
-                if isinstance(term, basestring):
+                if isinstance(term, str):
                     series_dict[term] = copy.deepcopy(options)
                 elif isinstance(term, dict):
-                    for tk, tv in term.items():
-                        if isinstance(tv, basestring):
+                    for tk, tv in list(term.items()):
+                        if isinstance(tv, str):
                             opts = copy.deepcopy(options)
                             opts['field'] = tv
                             series_dict[tk] = opts
@@ -246,8 +247,8 @@ def _convert_dps_to_dict(series_list):
                             series_dict[t] = opt 
          
         elif isinstance(terms, dict):
-            for tk, tv in terms.items():
-                if isinstance(tv, basestring):
+            for tk, tv in list(terms.items()):
+                if isinstance(tv, str):
                     opts = copy.deepcopy(options)
                     opts['field'] = tv
                     series_dict[tk] = opts
@@ -269,7 +270,7 @@ def clean_dps(series):
     if isinstance(series, dict):
         if not series:
             raise APIInputError("'series' cannot be empty.")
-        for tk, td in series.items():
+        for tk, td in list(series.items()):
             try:
                 td['source'] = _clean_source(td['source'])
             except KeyError:
@@ -304,11 +305,11 @@ def _convert_pcso_to_dict(series_options):
             raise APIInputError("%s is missing the 'terms' key." %stod)
         if isinstance(terms, list):
             for term in terms:
-                if isinstance(term, basestring):
+                if isinstance(term, str):
                     opts = copy.deepcopy(options)
                     series_options_dict.update({term: opts})
                 elif isinstance(term, dict):
-                    for tk, tv in term.items():
+                    for tk, tv in list(term.items()):
                         if not isinstance(tv, dict):
                             raise APIInputError("Expecting a dict in place "
                                                 "of: %s" %tv)
@@ -325,13 +326,13 @@ def clean_pcso(series_options, ds):
     """
     #todlist = term option dict list
     if isinstance(series_options, dict):
-        for sok, sod in series_options.items():
-            if sok not in ds.series.keys():
+        for sok, sod in list(series_options.items()):
+            if sok not in list(ds.series.keys()):
                     raise APIInputError("All the series terms must be present "
                                         "in the series dict of the "
                                         "datasource. Got %s. Allowed values "
                                         "are: %s" 
-                                        %(sok, ', '.join(ds.series.keys())))
+                                        %(sok, ', '.join(list(ds.series.keys()))))
             if not isinstance(sod, dict):
                 raise APIInputError("All the series options must be of the "
                                     "type dict. Got %s of type %s instead." 
@@ -363,18 +364,18 @@ def _convert_cso_to_dict(series_options):
         if isinstance(terms, dict):
             if not terms:
                 raise APIInputError("'terms' dict cannot be empty.")
-            for tk, td in terms.items():
+            for tk, td in list(terms.items()):
                 if isinstance(td, list):
                     for yterm in td:
-                        if isinstance(yterm, basestring):
+                        if isinstance(yterm, str):
                             opts = copy.deepcopy(options)
                             opts['_x_axis_term'] = tk
                             series_options_dict[yterm] = opts
                         elif isinstance(yterm, dict):
                             opts = copy.deepcopy(options)
-                            opts.update(yterm.values()[0])
+                            opts.update(list(yterm.values())[0])
                             opts['_x_axis_term'] = tk
-                            series_options_dict[yterm.keys()[0]] = opts
+                            series_options_dict[list(yterm.keys())[0]] = opts
                         else:
                             raise APIInputError("Expecting a basestring or "
                                                 "dict in place of: %s." %yterm)
@@ -390,23 +391,23 @@ def clean_cso(series_options, ds):
     """Clean the Chart series_options input from the user.
     """
     if isinstance(series_options, dict):
-        for sok, sod in series_options.items():
-            if sok not in ds.series.keys():
+        for sok, sod in list(series_options.items()):
+            if sok not in list(ds.series.keys()):
                     raise APIInputError("%s is not one of the keys of the "
                                         "datasource series. Allowed values "
                                         "are: %s" 
-                                        %(sok, ', '.join(ds.series.keys())))
+                                        %(sok, ', '.join(list(ds.series.keys()))))
             if not isinstance(sod, dict):
                 raise APIInputError("%s is of type: %s. Expecting a dict." 
                                     %(sod, type(sod)))
             try:
                 _x_axis_term = sod['_x_axis_term']
-                if _x_axis_term not in ds.series.keys():
+                if _x_axis_term not in list(ds.series.keys()):
                     raise APIInputError("%s is not one of the keys of the "
                                         "datasource series. Allowed values "
                                         "are: %s" 
                                         %(_x_axis_term, 
-                                          ', '.join(ds.series.keys())))
+                                          ', '.join(list(ds.series.keys()))))
             except KeyError:
                 raise APIInputError("Expecting a '_x_axis_term' for %s." %sod)
             if ds.series[sok]['_data'] != ds.series[_x_axis_term]['_data']:
@@ -430,9 +431,9 @@ def clean_sortf_mapf_mts(sortf_mapf_mts):
             raise APIInputError("%r must have exactly three elements."
                                 %sortf_mapf_mts)
         sortf, mapf, mts = sortf_mapf_mts
-        if not callable(sortf) and sortf is not None:
+        if not isinstance(sortf, collections.Callable) and sortf is not None:
             raise APIInputError("%r must be callable or None." %sortf)
-        if not callable(mapf) and mapf is not None:
+        if not isinstance(mapf, collections.Callable) and mapf is not None:
             raise APIInputError("%r must be callable or None." %mapf)
         mts = bool(mts)
     return (sortf, mapf, mts)
@@ -450,10 +451,10 @@ def clean_x_sortf_mapf_mts(x_sortf_mapf_mts):
             raise APIInputError("%r must have exactly three elements."
                                 %x_s_m_mts)
         x_sortf = x_s_m_mts[0]
-        if not callable(x_sortf) and x_sortf is not None:
+        if not isinstance(x_sortf, collections.Callable) and x_sortf is not None:
             raise APIInputError("%r must be callable or None." %x_sortf)
         x_mapf = x_s_m_mts[1]
-        if not callable(x_mapf) and x_mapf is not None:
+        if not isinstance(x_mapf, collections.Callable) and x_mapf is not None:
             raise APIInputError("%r must be callable or None." %x_mapf)
         x_mts = bool(x_s_m_mts[2])
         cleaned_x_s_m_mts.append((x_sortf, x_mapf, x_mts))

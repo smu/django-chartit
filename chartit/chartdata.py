@@ -4,7 +4,7 @@ from itertools import groupby, chain, islice
 from operator import itemgetter
 # use SortedDict instead of native OrderedDict for Python 2.6 compatibility
 from django.utils.datastructures import SortedDict
-from validation import clean_dps, clean_pdps
+from .validation import clean_dps, clean_pdps
 from chartit.validation import clean_sortf_mapf_mts
 
 class DataPool(object):
@@ -105,15 +105,15 @@ class DataPool(object):
         # TODO: using str(source.query) was the only way that I could think of
         # to compare whether two sources are exactly same. Need to figure out
         # if there is a better way. - PG
-        sort_grp_fn = lambda (tk, td): tuple(chain(str(td['source'].query), 
-                                              [td[t] for t in addl_grp_terms]))
-        s = sorted(self.series.items(), key=sort_grp_fn)
+        sort_grp_fn = lambda tk_td1: tuple(chain(str(tk_td1[1]['source'].query), 
+                                              [tk_td1[1][t] for t in addl_grp_terms]))
+        s = sorted(list(self.series.items()), key=sort_grp_fn)
         # The following groupby will create an iterator which returns 
         # <(grp-1, <(tk, td), ...>), (grp-2, <(tk, td), ...>), ...>
         # where sclt is a source, category, legend_by tuple
         qg = groupby(s, sort_grp_fn)
         if sort_by_term is not None:
-            sort_by_fn = lambda (tk, td): -1*(abs(td[sort_by_term]))
+            sort_by_fn = lambda tk_td: -1*(abs(tk_td[1][sort_by_term]))
         else:
             sort_by_fn = None
         qg = [sorted(itr, key=sort_by_fn) for (grp, itr) in qg]
@@ -393,11 +393,11 @@ class PivotDataPool(DataPool):
         
         self.series = clean_pdps(series)
         self.top_n_term = (top_n_term if top_n_term 
-                           in self.series.keys() else None)
+                           in list(self.series.keys()) else None)
         self.top_n = (top_n if (self.top_n_term is not None 
                                 and isinstance(top_n, int)) else 0)   
         self.pareto_term = (pareto_term if pareto_term in 
-                            self.series.keys() else None)
+                            list(self.series.keys()) else None)
         self.sortf, self.mapf, self.mts = clean_sortf_mapf_mts(sortf_mapf_mts)
         # query groups and data
         self.query_groups = \
@@ -540,7 +540,7 @@ class PivotDataPool(DataPool):
                 td['_lv_set'] = lv_set
         # If we only need top n items, remove the other items from self.cv_raw
         if self.top_n_term:
-            cum_cv_dfv_items = sorted(_cum_dfv_by_cv.items(), 
+            cum_cv_dfv_items = sorted(list(_cum_dfv_by_cv.items()), 
                                       key = itemgetter(1),
                                       reverse = self.top_n > 0)
             cv_dfv_top_n_items = cum_cv_dfv_items[0:abs(self.top_n)]
@@ -549,7 +549,7 @@ class PivotDataPool(DataPool):
             self.cv_raw = list(self.cv_raw)
         # If we need to pareto, order the category values in pareto order.
         if self.pareto_term:
-            pareto_cv_dfv_items = sorted(_pareto_by_cv.items(), 
+            pareto_cv_dfv_items = sorted(list(_pareto_by_cv.items()), 
                                          key = itemgetter(1) ,
                                          reverse = True)
             pareto_cv = [cv_dfv[0] for cv_dfv in pareto_cv_dfv_items]
@@ -573,4 +573,4 @@ class PivotDataPool(DataPool):
                 self.cv = [self.mapf(cv) for cv in self.cv_raw]
                 if self.mts: 
                     combined = sorted(zip(self.cv, self.cv_raw),key=self.sortf)
-                    self.cv, self.cv_raw = zip(*combined)
+                    self.cv, self.cv_raw = list(zip(*combined))
